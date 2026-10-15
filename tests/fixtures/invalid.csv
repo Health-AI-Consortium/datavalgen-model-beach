@@ -1,0 +1,3 @@
+patient_identifier,patient_t_stage,patient_n_stage,patient_m_stage,patient_overall_stage,year_of_diagnosis,interval_diagnosis_to_last_visit_in_days,vital_status,centre,age_at_diagnosis
+PT_TEST_0001,T1c,N0,M0,IA1,2015,730,alive,maastricht,10000
+PT_TEST_0002,T5c,N0,M0,IA1,2015,730,alive,maastricht,10000
