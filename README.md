@@ -89,3 +89,48 @@ $ docker run \
   validate
 ✅ No validation errors found.
 ```
+
+## Running as a federated algorithm
+
+This image doubles as a federated-learning (e.g. vantage6) validation
+algorithm, using `datavalgen`'s own `safe_validate` entrypoint — no extra
+code or service in this repo, just the same model from above.
+
+Instead of CLI flags, a federated runner points the image at a small JSON
+"run context" file via the `RUN_CONTEXT_FILE` environment variable:
+
+```json
+{
+  "entrypoint": {"name": "safe_validate"},
+  "inputs": [{"uri": "/data.csv"}],
+  "outputs": [{"uri": "/output/result.json"}],
+  "arguments": {"named": {}}
+}
+```
+
+```
+$ docker run \
+  --network none --rm --read-only --cap-drop=ALL --security-opt no-new-privileges=true --log-driver=none \
+  -v ./run_context.json:/run_context.json:ro \
+  -v ./fakedata/fakebeach.csv:/data.csv:ro \
+  -v ./output:/output \
+  -e RUN_CONTEXT_FILE=/run_context.json \
+  ghcr.io/maastrichtu-cds/datavalgen-model-beach:v0.1.1
+$ cat ./output/result.json
+{"num_errors": 0}
+```
+
+> [!IMPORTANT]
+> Unlike the local `validate` command above, `safe_validate` **only ever
+> returns an error count** — never field names, row numbers, or values. This
+> is intentional: the local `validate` output can show you your own data's
+> actual values because it never leaves your terminal, but a federated
+> result is meant to be sent back to a requesting party outside this site, so
+> it must not carry any patient data with it. Don't "improve" this output
+> with per-row detail.
+>
+> Model selection for this path is pinned to this package via the
+> `DATAVALGEN_DISTRIBUTION` environment variable baked into the image
+> (`datavalgen` refuses to run `safe_validate` without it), so a federated
+> orchestrator can't be tricked into validating against a different
+> package's model.
