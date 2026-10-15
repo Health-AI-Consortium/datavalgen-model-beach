@@ -22,13 +22,25 @@ Two nodes are configured (`tests/infra/nodes.env`):
 ```bash
 # from this repo's root
 ALG_ROOT="$(pwd)"
+
+# Only matters on non-amd64 hosts (e.g. Apple Silicon, arm64 Linux): the
+# vantage6 server-lite/node-lite images and datavalgen's own base image are
+# amd64-only. Without this, `infra.sh up`'s plain `docker pull` for an
+# image never pulled before fails outright with "no matching manifest for
+# linux/arm64/...", since the fallback-to-emulation logic in infra.sh only
+# kicks in *after* a pull already succeeded (it handles run-time
+# architecture mismatches, not pull-time manifest resolution). Harmless to
+# export unconditionally - a no-op on a native amd64 host.
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
+
 # Outside the repo on purpose - this is a clone of a whole separate project,
 # not something that belongs inside datavalgen-model-beach's own working tree.
 INFRA_DIR="$(mktemp -d)/v6-infra"
 git clone https://github.com/mdw-nl/v6-infrastructure-sh.git "$INFRA_DIR"
 cd "$INFRA_DIR"
-# pin to a known-good commit; see v6-infrastructure-sh's own tags/releases
-git checkout <INFRA_SHA>
+# Pinned to the same commit as .github/workflows/infra.yml's INFRA_SHA -
+# keep both in sync if you deliberately bump it.
+git checkout 4c8ca7b0cb616d8ceb8b51760f7eee9bd1a5c8e9
 
 sed "s#__REPO_ROOT__#$ALG_ROOT#g" "$ALG_ROOT/tests/infra/nodes.env" > infrastructure/nodes.env
 cp "$ALG_ROOT/tests/infra/config.env" infrastructure/config.env
