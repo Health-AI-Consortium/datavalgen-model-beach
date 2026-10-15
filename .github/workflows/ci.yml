@@ -106,13 +106,6 @@ jobs:
           ! grep -q "PT_TEST_0002" ctx2/out/result.json
           ! grep -q "patient_t_stage" ctx2/out/result.json
 
-      - name: "Confirm the image doesn't run as root"
-        run: |
-          set -euo pipefail
-          uid="$(docker run --rm --network none --entrypoint id datavalgen-model-beach:ci -u)"
-          echo "Container UID: $uid"
-          [ "$uid" != "0" ]
-
       - name: Scan image for vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:

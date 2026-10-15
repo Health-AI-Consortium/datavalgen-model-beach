@@ -22,11 +22,3 @@ COPY ./pyproject.toml /app/datavalgen-model-beach/pyproject.toml
 # install beach data model package, where already-installed datavalgen can
 # find models and factories via python entry-points
 RUN pip install --no-cache-dir /app/datavalgen-model-beach
-
-# run as non-root by default: the base image runs as root, which is fine for
-# the manual `docker run --user $(id -u):$(id -g)` CLI flow documented in the
-# README (that flag overrides this), but a federated/vantage6 orchestrator
-# invoking this image directly won't necessarily pass --user.
-# base image is Alpine, so BusyBox's adduser - not shadow-utils' useradd
-RUN adduser -D -H -u 1000 -s /sbin/nologin datavalgen
-USER datavalgen
