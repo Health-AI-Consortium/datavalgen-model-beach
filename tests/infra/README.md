@@ -22,7 +22,9 @@ Two nodes are configured (`tests/infra/nodes.env`):
 ```bash
 # from this repo's root
 ALG_ROOT="$(pwd)"
-INFRA_DIR="$ALG_ROOT/tools/v6-infra"
+# Outside the repo on purpose - this is a clone of a whole separate project,
+# not something that belongs inside datavalgen-model-beach's own working tree.
+INFRA_DIR="$(mktemp -d)/v6-infra"
 git clone https://github.com/mdw-nl/v6-infrastructure-sh.git "$INFRA_DIR"
 cd "$INFRA_DIR"
 # pin to a known-good commit; see v6-infrastructure-sh's own tags/releases
@@ -32,13 +34,13 @@ sed "s#__REPO_ROOT__#$ALG_ROOT#g" "$ALG_ROOT/tests/infra/nodes.env" > infrastruc
 cp "$ALG_ROOT/tests/infra/config.env" infrastructure/config.env
 
 cd infrastructure
-./infra.sh preflight
-ENVIRONMENT=CI ./infra.sh up
+PYTHON_INTERPRETER=python3.12 ./infra.sh preflight
+PYTHON_INTERPRETER=python3.12 ENVIRONMENT=CI UI_ENABLED=false ./infra.sh up
 
 V6_ALGO_IMAGE=datavalgen-model-beach:ci \
   bash "$ALG_ROOT/tests/infra/run_algo_smoke.sh"
 
-./infra.sh down
+PYTHON_INTERPRETER=python3.12 ENVIRONMENT=CI UI_ENABLED=false ./infra.sh down
 ```
 
 See `v6-infrastructure-sh`'s own `.skills/v6-infrastructure-skill/SKILL.md`
