@@ -43,6 +43,13 @@ V6_ALGO_IMAGE=datavalgen-model-beach:ci \
 PYTHON_INTERPRETER=python3.12 ENVIRONMENT=CI UI_ENABLED=false ./infra.sh down
 ```
 
+`run_algo_smoke.sh` pushes the locally-built image into a small disposable
+local registry container (`v6-local-registry`, port 5001 by default) before
+submitting any tasks — vantage6's node does an unconditional `docker pull`
+for whatever image a task names, which fails for a purely local-only image.
+That registry container is left running (`--restart unless-stopped`) for
+reuse across runs; `docker rm -f v6-local-registry` to clean it up.
+
 See `v6-infrastructure-sh`'s own `.skills/v6-infrastructure-skill/SKILL.md`
 for the full option set, troubleshooting, and the GitHub Actions pattern
 this is meant to slot into.

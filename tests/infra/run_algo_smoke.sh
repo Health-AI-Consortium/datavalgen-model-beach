@@ -9,11 +9,32 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 # V6_ALGO_IMAGE tells *this script* which image to hand to the vantage6
 # server via client.task.create(image=...) - unrelated to RUN_CONTEXT_FILE,
 # which is a separate env var the algorithm container itself reads once
-# vantage6 actually starts running it. Defaults to the tag used elsewhere in
-# this repo (ci.yml, the README's local build instructions); override if
-# you built/tagged it differently.
-export V6_ALGO_IMAGE="${V6_ALGO_IMAGE:-datavalgen-model-beach:ci}"
-echo "Using algorithm image: $V6_ALGO_IMAGE"
+# vantage6 actually starts running it.
+#
+# vantage6's node does an unconditional `docker pull` for whatever image a
+# task names, which fails for a purely local-only image (there's nothing to
+# pull from - it's not in any registry). Mirror it into a small disposable
+# local registry instead and point V6_ALGO_IMAGE at that registry-qualified
+# reference, per v6-infrastructure-sh's own skill doc ("Local registry for
+# custom images"). Set V6_ALGO_IMAGE yourself to the already-registry-qualified
+# form to skip this (e.g. if you've pushed it somewhere real).
+LOCAL_IMAGE="${V6_ALGO_IMAGE:-datavalgen-model-beach:ci}"
+REGISTRY_PORT="${REGISTRY_PORT:-5001}"
+REGISTRY_CONTAINER_NAME="${REGISTRY_CONTAINER_NAME:-v6-local-registry}"
+
+if ! docker inspect -f '{{.State.Running}}' "$REGISTRY_CONTAINER_NAME" >/dev/null 2>&1; then
+  if docker inspect "$REGISTRY_CONTAINER_NAME" >/dev/null 2>&1; then
+    docker start "$REGISTRY_CONTAINER_NAME" >/dev/null
+  else
+    docker run -d --restart unless-stopped -p "${REGISTRY_PORT}:5000" \
+      --name "$REGISTRY_CONTAINER_NAME" registry:2 >/dev/null
+  fi
+fi
+
+export V6_ALGO_IMAGE="localhost:${REGISTRY_PORT}/${LOCAL_IMAGE}"
+docker tag "$LOCAL_IMAGE" "$V6_ALGO_IMAGE"
+docker push "$V6_ALGO_IMAGE" >/dev/null
+echo "Using algorithm image: $V6_ALGO_IMAGE (mirrored from local image $LOCAL_IMAGE)"
 
 # vantage6-client (via vantage6-common) uses `list | None`-style union type
 # hints evaluated eagerly, which only works on Python 3.10+. Whatever `python3`
