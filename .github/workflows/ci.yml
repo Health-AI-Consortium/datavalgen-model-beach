@@ -1,0 +1,121 @@
+name: Build and test image
+
+# Runs on every push/PR, unlike build_and_release.yaml which only fires on
+# release tags. This is where we catch a broken image *before* it's tagged:
+# does it still build, does local `validate` still work, and does the
+# federated `safe_validate` path still return an error count without ever
+# leaking a row value.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-smoke-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83
+        with:
+          context: .
+          push: false
+          load: true
+          tags: datavalgen-model-beach:ci
+
+      # --- local CLI path: unchanged behavior from the README examples ---
+
+      - name: "Smoke test: generate + validate (local CLI path)"
+        run: |
+          set -euo pipefail
+          mkdir -p fakedata
+          chmod 777 fakedata
+
+          docker run --rm --network none --read-only --cap-drop=ALL \
+            --security-opt no-new-privileges=true --log-driver=none \
+            -v "$PWD/fakedata:/data/" \
+            datavalgen-model-beach:ci \
+            generate -o fakebeach.csv
+
+          docker run --rm --network none --read-only --cap-drop=ALL \
+            --security-opt no-new-privileges=true --log-driver=none \
+            -v "$PWD/fakedata/fakebeach.csv:/data.csv:ro" \
+            datavalgen-model-beach:ci \
+            validate
+
+      # --- federated path: datavalgen's safe_validate via RUN_CONTEXT_FILE ---
+
+      - name: "Smoke test: federated safe_validate (valid data, expect 0 errors)"
+        run: |
+          set -euo pipefail
+          mkdir -p ctx/in ctx/out
+          chmod -R 777 ctx
+
+          cp data/202604_synthetic/splits_by_centre/maastricht.csv ctx/in/data.csv
+          cat > ctx/in/run_context.json <<'JSON'
+          {
+            "entrypoint": {"name": "safe_validate"},
+            "inputs": [{"uri": "/ctx/in/data.csv"}],
+            "outputs": [{"uri": "/ctx/out/result.json"}],
+            "arguments": {"named": {}}
+          }
+          JSON
+
+          docker run --rm --network none --read-only --cap-drop=ALL \
+            --security-opt no-new-privileges=true --log-driver=none \
+            -v "$PWD/ctx:/ctx" \
+            -e RUN_CONTEXT_FILE=/ctx/in/run_context.json \
+            datavalgen-model-beach:ci
+
+          cat ctx/out/result.json
+          grep -Eq '"num_errors"\s*:\s*0\b' ctx/out/result.json
+
+      - name: "Smoke test: federated safe_validate (invalid data, expect 1 error, no leakage)"
+        run: |
+          set -euo pipefail
+          mkdir -p ctx2/in ctx2/out
+          chmod -R 777 ctx2
+
+          cp tests/fixtures/invalid.csv ctx2/in/data.csv
+          cat > ctx2/in/run_context.json <<'JSON'
+          {
+            "entrypoint": {"name": "safe_validate"},
+            "inputs": [{"uri": "/ctx2/in/data.csv"}],
+            "outputs": [{"uri": "/ctx2/out/result.json"}],
+            "arguments": {"named": {}}
+          }
+          JSON
+
+          docker run --rm --network none --read-only --cap-drop=ALL \
+            --security-opt no-new-privileges=true --log-driver=none \
+            -v "$PWD/ctx2:/ctx2" \
+            -e RUN_CONTEXT_FILE=/ctx2/in/run_context.json \
+            datavalgen-model-beach:ci
+
+          cat ctx2/out/result.json
+          grep -Eq '"num_errors"\s*:\s*1\b' ctx2/out/result.json
+
+          # the whole point of safe_validate: the bad value/field/row never
+          # shows up in the federated output, only the count does.
+          ! grep -q "T5c" ctx2/out/result.json
+          ! grep -q "PT_TEST_0002" ctx2/out/result.json
+          ! grep -q "patient_t_stage" ctx2/out/result.json
+
+      - name: "Confirm the image doesn't run as root"
+        run: |
+          set -euo pipefail
+          uid="$(docker run --rm --network none --entrypoint id datavalgen-model-beach:ci -u)"
+          echo "Container UID: $uid"
+          [ "$uid" != "0" ]
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          image-ref: datavalgen-model-beach:ci
+          severity: CRITICAL,HIGH
+          exit-code: "1"
