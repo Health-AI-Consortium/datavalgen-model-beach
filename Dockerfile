@@ -27,5 +27,6 @@ RUN pip install --no-cache-dir /app/datavalgen-model-beach
 # the manual `docker run --user $(id -u):$(id -g)` CLI flow documented in the
 # README (that flag overrides this), but a federated/vantage6 orchestrator
 # invoking this image directly won't necessarily pass --user.
-RUN useradd --no-create-home --uid 1000 --shell /usr/sbin/nologin datavalgen
+# base image is Alpine, so BusyBox's adduser - not shadow-utils' useradd
+RUN adduser -D -H -u 1000 -s /sbin/nologin datavalgen
 USER datavalgen
