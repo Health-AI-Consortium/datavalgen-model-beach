@@ -50,8 +50,8 @@ jobs:
       - name: Start infra
         run: |
           cd tools/v6-infra/infrastructure
-          PYTHON_INTERPRETER=python3 ./infra.sh preflight
-          PYTHON_INTERPRETER=python3 ENVIRONMENT=CI UI_ENABLED=false ./infra.sh up
+          PYTHON_INTERPRETER=python3.12 ./infra.sh preflight
+          PYTHON_INTERPRETER=python3.12 ENVIRONMENT=CI UI_ENABLED=false ./infra.sh up
 
       - name: Algorithm smoke (submit tasks, check results)
         env:
@@ -61,10 +61,10 @@ jobs:
       - name: Infra smoke
         run: |
           cd tools/v6-infra/infrastructure
-          PYTHON_INTERPRETER=python3 UI_ENABLED=false ./infra.sh test
+          PYTHON_INTERPRETER=python3.12 UI_ENABLED=false ./infra.sh test
 
       - name: Shutdown infra
         if: always()
         run: |
           cd tools/v6-infra/infrastructure
-          PYTHON_INTERPRETER=python3 ENVIRONMENT=CI UI_ENABLED=false ./infra.sh down
+          PYTHON_INTERPRETER=python3.12 ENVIRONMENT=CI UI_ENABLED=false ./infra.sh down
