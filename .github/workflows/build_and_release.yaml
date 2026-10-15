@@ -32,6 +32,22 @@ jobs:
           echo "image_name=$REPO_LC" >> "$GITHUB_OUTPUT"
           echo "tag_version=$TAG_VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Verify tag matches pyproject.toml version
+        # Guards against shipping an image tagged with a version that
+        # doesn't match what's actually in pyproject.toml (the class of bug
+        # behind strata-fit/strata-fit-data-schema#18's "pip only ever sees
+        # 0.1.0" version drift). The Makefile already derives the git tag
+        # from pyproject.toml, so this should only ever fire on a manual,
+        # mistaken tag push.
+        run: |
+          PKG_VERSION="$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          TAG_VERSION="${{ steps.meta.outputs.tag_version }}"
+          TAG_VERSION_NO_V="${TAG_VERSION#v}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION_NO_V" ]; then
+            echo "::error::Tag '$TAG_VERSION' (version $TAG_VERSION_NO_V) does not match pyproject.toml version '$PKG_VERSION'"
+            exit 1
+          fi
+
       - name: Log in to GitHub Container Registry
         # https://github.com/docker/login-action/releases/tag/v3.6.0
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
