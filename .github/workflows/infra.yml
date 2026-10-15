@@ -1,0 +1,70 @@
+name: Federated infra smoke test (vantage6)
+
+# Manual-only for now: this spins up a real local vantage6 server + 2 nodes
+# via the v6-infrastructure-sh harness and submits real tasks, which is slow
+# and network-heavy compared to ci.yml's direct `docker run` smoke tests.
+# Run it on demand (Actions tab -> Run workflow) once you want the deeper
+# "does this actually work through a vantage6 node" signal; see
+# tests/infra/README.md for what it checks and why it isn't wired into
+# every push/PR yet.
+on:
+  workflow_dispatch:
+
+env:
+  # Pinned per v6-infrastructure-sh's own guardrail ("Always pin infra by
+  # commit SHA in CI"). This was origin/main at the time this workflow was
+  # added; bump deliberately, not automatically.
+  INFRA_SHA: "4c8ca7b0cb616d8ceb8b51760f7eee9bd1a5c8e9"
+
+jobs:
+  infra-smoke:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout algorithm repo
+        uses: actions/checkout@v4
+
+      - name: Checkout infra harness
+        uses: actions/checkout@v4
+        with:
+          repository: mdw-nl/v6-infrastructure-sh
+          ref: ${{ env.INFRA_SHA }}
+          path: tools/v6-infra
+
+      - name: Build algorithm image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83
+        with:
+          context: .
+          push: false
+          load: true
+          tags: datavalgen-model-beach:ci
+
+      - name: Inject repo test config
+        run: |
+          set -euo pipefail
+          sed "s#__REPO_ROOT__#${GITHUB_WORKSPACE}#g" tests/infra/nodes.env > tools/v6-infra/infrastructure/nodes.env
+          cp tests/infra/config.env tools/v6-infra/infrastructure/config.env
+
+      - name: Start infra
+        run: |
+          cd tools/v6-infra/infrastructure
+          PYTHON_INTERPRETER=python3 ./infra.sh preflight
+          PYTHON_INTERPRETER=python3 ENVIRONMENT=CI UI_ENABLED=false ./infra.sh up
+
+      - name: Algorithm smoke (submit tasks, check results)
+        env:
+          V6_ALGO_IMAGE: datavalgen-model-beach:ci
+        run: bash tests/infra/run_algo_smoke.sh
+
+      - name: Infra smoke
+        run: |
+          cd tools/v6-infra/infrastructure
+          PYTHON_INTERPRETER=python3 UI_ENABLED=false ./infra.sh test
+
+      - name: Shutdown infra
+        if: always()
+        run: |
+          cd tools/v6-infra/infrastructure
+          PYTHON_INTERPRETER=python3 ENVIRONMENT=CI UI_ENABLED=false ./infra.sh down
