@@ -6,6 +6,15 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
+# V6_ALGO_IMAGE tells *this script* which image to hand to the vantage6
+# server via client.task.create(image=...) - unrelated to RUN_CONTEXT_FILE,
+# which is a separate env var the algorithm container itself reads once
+# vantage6 actually starts running it. Defaults to the tag used elsewhere in
+# this repo (ci.yml, the README's local build instructions); override if
+# you built/tagged it differently.
+export V6_ALGO_IMAGE="${V6_ALGO_IMAGE:-datavalgen-model-beach:ci}"
+echo "Using algorithm image: $V6_ALGO_IMAGE"
+
 # vantage6-client (via vantage6-common) uses `list | None`-style union type
 # hints evaluated eagerly, which only works on Python 3.10+. Whatever `python3`
 # resolves to on a given machine isn't reliable (hit Python 3.9 locally), so
