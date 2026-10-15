@@ -29,6 +29,13 @@ jobs:
           tags: datavalgen-model-beach:ci
 
       # --- local CLI path: unchanged behavior from the README examples ---
+      #
+      # --user "$(id -u):$(id -g)" matches the README's own documented
+      # invocation, and matters here: datavalgen's `generate` chowns its
+      # output to match the mounted directory's owner, and --cap-drop=ALL
+      # removes CAP_CHOWN entirely (root included), so that only succeeds
+      # when the container's UID already equals the mount's owner (the
+      # runner's own UID, since `mkdir` above runs as the runner).
 
       - name: "Smoke test: generate + validate (local CLI path)"
         run: |
@@ -37,13 +44,13 @@ jobs:
           chmod 777 fakedata
 
           docker run --rm --network none --read-only --cap-drop=ALL \
-            --security-opt no-new-privileges=true --log-driver=none \
+            --security-opt no-new-privileges=true --log-driver=none --user "$(id -u):$(id -g)" \
             -v "$PWD/fakedata:/data/" \
             datavalgen-model-beach:ci \
             generate -o fakebeach.csv
 
           docker run --rm --network none --read-only --cap-drop=ALL \
-            --security-opt no-new-privileges=true --log-driver=none \
+            --security-opt no-new-privileges=true --log-driver=none --user "$(id -u):$(id -g)" \
             -v "$PWD/fakedata/fakebeach.csv:/data.csv:ro" \
             datavalgen-model-beach:ci \
             validate
@@ -67,7 +74,7 @@ jobs:
           JSON
 
           docker run --rm --network none --read-only --cap-drop=ALL \
-            --security-opt no-new-privileges=true --log-driver=none \
+            --security-opt no-new-privileges=true --log-driver=none --user "$(id -u):$(id -g)" \
             -v "$PWD/ctx:/ctx" \
             -e RUN_CONTEXT_FILE=/ctx/in/run_context.json \
             datavalgen-model-beach:ci
@@ -92,7 +99,7 @@ jobs:
           JSON
 
           docker run --rm --network none --read-only --cap-drop=ALL \
-            --security-opt no-new-privileges=true --log-driver=none \
+            --security-opt no-new-privileges=true --log-driver=none --user "$(id -u):$(id -g)" \
             -v "$PWD/ctx2:/ctx2" \
             -e RUN_CONTEXT_FILE=/ctx2/in/run_context.json \
             datavalgen-model-beach:ci
