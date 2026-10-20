@@ -22,3 +22,9 @@ COPY ./pyproject.toml /app/datavalgen-model-beach/pyproject.toml
 # install beach data model package, where already-installed datavalgen can
 # find models and factories via python entry-points
 RUN pip install --no-cache-dir /app/datavalgen-model-beach
+
+# temporary: decodes vantage6's base32-encoded env vars before exec'ing
+# datavalgen (see docker/entrypoint.py); revert to the base image's
+# ENTRYPOINT ["datavalgen"] once upstream run-context-py decodes them itself
+COPY ./docker/entrypoint.py /app/datavalgen-model-beach/entrypoint.py
+ENTRYPOINT ["python", "/app/datavalgen-model-beach/entrypoint.py"]
