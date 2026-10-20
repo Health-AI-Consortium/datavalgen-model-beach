@@ -82,14 +82,16 @@ jobs:
           cat ctx/out/result.json
           grep -Eq '"num_errors"\s*:\s*0\b' ctx/out/result.json
 
-      - name: "Smoke test: federated safe_validate (invalid data, expect 1 error, no leakage)"
+      # Passes RUN_CONTEXT_FILE the way a real vantage6 node does: base32-encoded,
+      # '=' padding replaced by '!'. A plain path alone missed exactly this once.
+      - name: "Smoke test: federated safe_validate, vantage6-encoded env (invalid data, expect 1 error, no leakage)"
         run: |
           set -euo pipefail
           mkdir -p ctx2/in ctx2/out
           chmod -R 777 ctx2
 
           cp tests/fixtures/invalid.csv ctx2/in/data.csv
-          cat > ctx2/in/run_context.json <<'JSON'
+          cat > ctx2/in/context.json <<'JSON'
           {
             "entrypoint": {"name": "safe_validate"},
             "inputs": [{"uri": "/ctx2/in/data.csv"}],
@@ -98,10 +100,13 @@ jobs:
           }
           JSON
 
+          # filename length chosen so the encoding needs padding, i.e. exercises '!'
+          encoded="$(python3 -c "import base64; print(base64.b32encode(b'/ctx2/in/context.json').decode().replace('=', '!'))")"
+
           docker run --rm --network none --read-only --cap-drop=ALL \
             --security-opt no-new-privileges=true --log-driver=none --user "$(id -u):$(id -g)" \
             -v "$PWD/ctx2:/ctx2" \
-            -e RUN_CONTEXT_FILE=/ctx2/in/run_context.json \
+            -e RUN_CONTEXT_FILE="$encoded" \
             datavalgen-model-beach:ci
 
           cat ctx2/out/result.json

@@ -12,9 +12,10 @@ on:
 
 env:
   # Pinned per v6-infrastructure-sh's own guardrail ("Always pin infra by
-  # commit SHA in CI"). This was origin/main at the time this workflow was
-  # added; bump deliberately, not automatically.
-  INFRA_SHA: "4c8ca7b0cb616d8ceb8b51760f7eee9bd1a5c8e9"
+  # commit SHA in CI"). Needs at least 3d81aa7 (waits for the server API before
+  # importing users; earlier, only the last org's users could create tasks).
+  # Bump deliberately: later commits switch to nodes.<profile>.env files.
+  INFRA_SHA: "fcb0f2bf5782a1528df0cefa7d2ef5e4b8e86c5f"
 
 jobs:
   infra-smoke:
@@ -56,12 +57,30 @@ jobs:
       - name: Algorithm smoke (submit tasks, check results)
         env:
           V6_ALGO_IMAGE: datavalgen-model-beach:ci
-        run: bash tests/infra/run_algo_smoke.sh
+        run: |
+          set -o pipefail
+          bash tests/infra/run_algo_smoke.sh 2>&1 | tee smoke.log
 
       - name: Infra smoke
         run: |
           cd tools/v6-infra/infrastructure
           PYTHON_INTERPRETER=python3.12 UI_ENABLED=false ./infra.sh test
+
+      # Job logs need a GitHub login to read; annotations don't. Surfacing the
+      # failure here means a failed run can be diagnosed from its summary alone.
+      - name: Surface failure details (smoke output, vantage6 container logs)
+        if: failure()
+        run: |
+          annotate() {
+            body="$(sed 's/\x1b\[[0-9;]*m//g' | tail -n "$2" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | awk 'BEGIN{ORS="%0A"} {print}')"
+            if [ -n "$body" ]; then echo "::error title=$1::$body"; fi
+          }
+          [ -f smoke.log ] && annotate "algorithm smoke output" 40 < smoke.log
+          for c in $(docker ps -a --format '{{.Names}}' | grep '^vantage6-'); do
+            echo "===== $c ====="
+            docker logs "$c" 2>&1 | tail -n 300
+            docker logs "$c" 2>&1 | grep -E 'WARNING|ERROR|CRITICAL|Traceback|Error|\[Task [0-9]+\]|Starting task|status' | annotate "$c" 60
+          done
 
       - name: Shutdown infra
         if: always()
