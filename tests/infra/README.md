@@ -40,7 +40,7 @@ git clone https://github.com/mdw-nl/v6-infrastructure-sh.git "$INFRA_DIR"
 cd "$INFRA_DIR"
 # Pinned to the same commit as .github/workflows/infra.yml's INFRA_SHA -
 # keep both in sync if you deliberately bump it.
-git checkout 4c8ca7b0cb616d8ceb8b51760f7eee9bd1a5c8e9
+git checkout fcb0f2bf5782a1528df0cefa7d2ef5e4b8e86c5f
 
 sed "s#__REPO_ROOT__#$ALG_ROOT#g" "$ALG_ROOT/tests/infra/nodes.env" > infrastructure/nodes.env
 cp "$ALG_ROOT/tests/infra/config.env" infrastructure/config.env

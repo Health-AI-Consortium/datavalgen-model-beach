@@ -12,9 +12,10 @@ on:
 
 env:
   # Pinned per v6-infrastructure-sh's own guardrail ("Always pin infra by
-  # commit SHA in CI"). This was origin/main at the time this workflow was
-  # added; bump deliberately, not automatically.
-  INFRA_SHA: "4c8ca7b0cb616d8ceb8b51760f7eee9bd1a5c8e9"
+  # commit SHA in CI"). Needs at least 3d81aa7 (waits for the server API before
+  # importing users; earlier, only the last org's users could create tasks).
+  # Bump deliberately: later commits switch to nodes.<profile>.env files.
+  INFRA_SHA: "fcb0f2bf5782a1528df0cefa7d2ef5e4b8e86c5f"
 
 jobs:
   infra-smoke:
